@@ -1,14 +1,13 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - '*.*.*'
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v3
@@ -31,13 +30,6 @@ jobs:
         with:
           path: node_modules
           key: buildCachev25
-
-      - name: Cache
-        id: cache2
-        uses: actions/cache@v3
-        with:
-          path: Mod Manager/node_modules
-          key: buildCache2v20
 
       - name: Install dependencies
         if: steps.cache.outputs.cache-hit != 'true'
@@ -67,33 +59,10 @@ jobs:
           copy ./src/smf-rust.node ./compiled/smf-rust.node
           pkg package.json --targets node18-win-x64 --output Deploy.exe --compress Brotli
 
-      - name: Install GUI dependencies
-        if: steps.cache2.outputs.cache-hit != 'true'
-        run: |
-          cd "Mod Manager"
-          npm install
-          cd ../
-
-      - name: Build GUI
-        run: |
-          cd "Mod Manager"
-          npm run build
-          cd ../
-
       - name: Ready for zip
         run: |
           New-Item -ItemType Directory dist
-          New-Item -ItemType Directory dist/Third-Party
-          New-Item -ItemType Directory dist/Info
-          New-Item -ItemType Directory dist/API
-          New-Item -ItemType Directory "dist/Mod Manager"
-          robocopy ./Third-Party ./dist/Third-Party /E; if ($lastexitcode -lt 8) { $global:LASTEXITCODE = $null }
-          robocopy "./For Build" ./dist /E; if ($lastexitcode -lt 8) { $global:LASTEXITCODE = $null }
-          robocopy ./docs ./dist/Info /E; if ($lastexitcode -lt 8) { $global:LASTEXITCODE = $null }
-          robocopy ./compiled ./dist/API /E *.d.ts; if ($lastexitcode -lt 8) { $global:LASTEXITCODE = $null }
-          robocopy ".\Mod Manager\dist\win-unpacked" "./dist/Mod Manager" /E; if ($lastexitcode -lt 8) { $global:LASTEXITCODE = $null }
           copy Deploy.exe dist
-          New-Item -Path dist -Name "Mod Manager.cmd" -ItemType "file" -Value "@echo off`ncd `"Mod Manager`"`nstart `"`" `"Mod Manager.exe`""
 
       - name: Zip
         uses: TheDoctor0/zip-release@4fb9e4ff72847dd3d1c111cf63834e353ed7cb3d
@@ -101,62 +70,8 @@ jobs:
           filename: Release.zip
           directory: dist
 
-      - name: Get latest tag
-        id: latestTag
-        uses: 'WyriHaximus/github-action-get-previous-tag@v1.1.0'
-        with:
-          fallback: unknown
-
-      - name: Generate changelog
-        id: changelog
-        uses: loopwerk/tag-changelog@v1.0.4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          config_file: .github/tag-changelog-config.js
-          exclude_types: other,docs,chore,build,amend,refactor
-
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          name: ${{ steps.latestTag.outputs.tag }}
-          body: ${{ steps.changelog.outputs.changes }}
-          tag_name: ${{ steps.latestTag.outputs.tag }}
-          repository: atampy25/simple-mod-framework
+          tag_name: v1.33.7
           files: dist/Release.zip
-
-  sentry-release:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-
-      - name: Cache
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: node_modules
-          key: buildCachev23
-
-      - name: Install dependencies
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          npm install
-
-      - name: Compile TypeScript
-        run: |
-          npm install -g tsc-silent
-          tsc-silent -p tsconfig.json --suppress @
-
-      - name: Sentry release
-        uses: getsentry/action-release@v1.1.6
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-        with:
-          environment: production
-          version: ${{ github.ref }}
-          sourcemaps: './compiled/core-singleton.js.map ./compiled/core.js.map ./compiled/crc32.js.map ./compiled/deploy.js.map ./compiled/difference.js.map ./compiled/discover.js.map ./compiled/main.js.map ./compiled/patchWorker.js.map ./compiled/quickentity-3.js.map ./compiled/quickentity-rs.js.map ./compiled/quickentity.js.map ./compiled/quickentity20.js.map ./compiled/quickentity1136.js.map ./compiled/rpkg.js.map ./compiled/three-onlymath.min.js.map ./compiled/types.js.map ./compiled/typescript.js.map ./compiled/utils.js.map'

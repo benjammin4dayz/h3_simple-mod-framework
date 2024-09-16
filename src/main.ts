@@ -18,6 +18,8 @@ import md5File from "md5-file"
 import path from "path"
 import { xxhash3 } from "hash-wasm"
 
+import meow from "./cat"
+
 require("clarify")
 
 const gameHashes = {
@@ -148,6 +150,8 @@ process.on("SIGINT", () => void core.logger.error("Received SIGINT signal"))
 process.on("SIGTERM", () => void core.logger.error("Received SIGTERM signal"))
 
 async function doTheThing() {
+	await meow()
+
 	if (typeof core.config.platform === "undefined") {
 		await core.logger.error(
 			"Unknown game version. If the game has recently updated, the framework will need to be patched by its developers. If you're using a cracked version of the game, that's the problem."
